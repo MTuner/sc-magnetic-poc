@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/light.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script>
+
+    <script>
+        let textarea = null;
+        let magnetometer = null;
+        const recordingDurationMs = 39000;
+
+        window.onload = function() {
+            textarea = document.getElementById("output");
+            initMagnetometer();
+        };
+
+        function lockUI() {
+            document.getElementById('recordButton').disabled = true;
+            document.getElementById('patternButton').disabled = true;
+            document.getElementById('pocButton').disabled = true;
+        }
+
+        function log(message) {
+            console.log(message);
+            textarea.value += message + "\n";
+        }
+
+        function generatePattern() {
+            lockUI();
+
+            const numOfWorkers = navigator.hardwareConcurrency;
+            let task = {
+                "workers": numOfWorkers,
+                "message": "00101010101010101000",
+                "workerMessages": [],
+                "tick": 2000
+            };
+
+            log("[+] Generating CPU activity pattern");
+
+            let workersFinished = 0;
+            for (let i = 0; i < task.workers; i++) {
+                let worker = new Worker("worker.js");
+                worker.onmessage = function(e) {
+                    if (e.data.result === 'Finished') {
+                        workersFinished++;
+                        if (workersFinished === numOfWorkers)
+                            log("[+] DONE Generating CPU activity pattern")
+                    }
+                };
+                task.id = i;
+                worker.postMessage({task})
+            }
+        }
+
+        let t = [], x = [], y = [], z = [];
+
+        function initMagnetometer() {
+            if (typeof(UncalibratedMagnetometer) === "undefined") {
+                log("[!] The Magnetometer interface is not available. Recording is not possible.");
+                log("    Check prerequisites:");
+                log("    - An Android device equipeed with a magnetometer.");
+                log("    - Chrome mobile web browser");
+                log("    - Secure Context (in particular, HTTPS)");
+                log("    - \"Generic Sensor Extra Classes\" flag enabled in the chrome://flags");
+                document.getElementById('recordButton').disabled = true;
+                document.getElementById('pocButton').disabled = true;
+            } else {
+                magnetometer = new UncalibratedMagnetometer({ frequency: 10 });
+                magnetometer.onreading = function() {
+                    x.push(magnetometer.x);
+                    y.push(magnetometer.y);
+                    z.push(magnetometer.z);
+                    t.push(magnetometer.timestamp);
+                };
+            }
+        }
+
+        function recordMagnetometer(callback) {
+            lockUI();
+
+            let recordingTimeout = setTimeout(function () {
+                magnetometer.stop();
+                log("[+] DONE magnetometer recording");
+                plotMeasurements();
+            }, recordingDurationMs);
+
+            log("[+] Starting magnetometer recording");
+            magnetometer.start();
+        }
+
+        function poc() {
+            recordMagnetometer();
+            generatePattern();
+        }
+
+        function plotMeasurements() {
+            let t0 = t[0];
+            for (let i=0; i < t.length; ++i) {
+                t[i] = ((t[i] - t0) / 10e2).toFixed(2)
+            }
+
+            const options = {
+                legend: {
+                    display: false
+                },
+                elements: {
+                    point: {radius: 0}
+                },
+                scales: {
+                    xAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: "Time (seconds)"
+                        },
+                        type: 'category',
+                        ticks: {maxTicksLimit: 10}
+                    }],
+                    yAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: "Signal amplitude (muT)"
+                        }
+                    }]
+                }
+            };
+
+            options['title'] = { display: true, text: "Magnetometer, X axis" };
+            let ctx = document.getElementById('xChart').getContext('2d');
+            let xchart = new Chart(ctx, {
+                type: 'line',
+                data: {labels: t, datasets: [{label: 'X', fill: false, borderColor: 'rgb(255, 99, 132)', data: x}]},
+                options: options
+            });
+            options['title'] = { display: true, text: "Magnetometer, Y axis" };
+            ctx = document.getElementById('yChart').getContext('2d');
+            let ychart = new Chart(ctx, {
+                type: 'line',
+                data: {labels: t, datasets: [{label: 'Y', fill: false, borderColor: 'rgb(255, 99, 132)', data: y}]},
+                options: options
+            });
+            options['title'] = { display: true, text: "Magnetometer, Z axis" };
+            ctx = document.getElementById('zChart').getContext('2d');
+            let zchart = new Chart(ctx, {
+                type: 'line',
+                data: {labels: t, datasets: [{label: 'Z', fill: false, borderColor: 'rgb(255, 99, 132)', data: z}]},
+                options: options
+            });
+
+        }
+    </script>
+    <title>MagneticSpy PoC</title>
+</head>
+<body>
+<h1>PoC: Magnetometer reaction to the CPU activity</h1>
+<details>
+    <summary>Description</summary>
+    <p>
+        This page demonstrates how magnetometer on mobile devices can be disturbed by the CPU.
+        A distinct CPU pattern is produced by alternating between peak (up to 100\% CPU) and idle CPU loads lasting 2sec each (see example below).
+        At the same time, magnetometer is recorded using the Generic Sensor API. After ~40 seconds, sensor measurements are shown along 3 axes.
+        On many smartphones, the pattern is visually distinguished in the sensor measurements.
+    </p>
+
+    <p>
+        Potential privacy and security implications are discussed in the <a href="https://arxiv.org/abs/1906.11117"> MagneticSpy</a> paper.
+    </p>
+
+    <h5>CPU activity pattern</h5>
+    <img src="pattern.png" width="580px"/>
+    <h5>Example: magnetometer recorded on Google Pixel 2</h5>
+    <img src="screenshot-pixel2-crop.png" width="600px"/>
+</details>
+
+<br/>
+
+<button id="pocButton" onclick="poc()">PoC: generate CPU activity and record magnetometer</button>
+<br/>
+<!--<button id="patternButton" onclick="generatePattern()">Only generate CPU activity</button>-->
+<!--<button id="recordButton" onclick="recordMagnetometer()">Only record magnetometer</button>-->
+<textarea id="output" readonly rows="15" cols="30"></textarea>
+<canvas id="xChart"></canvas>
+<canvas id="yChart"></canvas>
+<canvas id="zChart"></canvas>
+</body>
+</html>
