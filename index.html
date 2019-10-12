@@ -61,7 +61,7 @@
                 log("    Check prerequisites:");
                 log("    - An Android device equipeed with a magnetometer.");
                 log("    - Chrome mobile web browser");
-                log("    - Secure Context (in particular, HTTPS)");
+                log("    - Secure Context");
                 log("    - \"Generic Sensor Extra Classes\" flag enabled in the chrome://flags");
                 document.getElementById('recordButton').disabled = true;
                 document.getElementById('pocButton').disabled = true;
@@ -157,9 +157,8 @@
     <summary>Description</summary>
     <p>
         This page demonstrates how magnetometer on mobile devices can be disturbed by the CPU.
-        A distinct CPU pattern is produced by alternating between peak (up to 100\% CPU) and idle CPU loads lasting 2sec each (see example below).
-        At the same time, magnetometer is recorded using the Generic Sensor API. After ~40 seconds, sensor measurements are shown along 3 axes.
-        On many smartphones, the pattern is visually distinguished in the sensor measurements.
+        A distinct CPU pattern is produced by alternating between high (up to 100\% CPU) and idle CPU loads lasting 2sec each (see example below).
+        At the same time, magnetometer is recorded using the Generic Sensor API. After ~40 seconds, sensor measurements are shown along 3 axes. On many smartphones, the pattern is visually distinguished in the sensor measurements.
     </p>
 
     <p>
@@ -168,16 +167,16 @@
 
     <h5>CPU activity pattern</h5>
     <img src="pattern.png" width="580px"/>
-    <h5>Example: magnetometer recorded on Google Pixel 2</h5>
+    <h5>Example: sensor measurements recorded on a Google Pixel 2</h5>
     <img src="screenshot-pixel2-crop.png" width="600px"/>
 </details>
 
 <br/>
 
-<button id="pocButton" onclick="poc()">PoC: generate CPU activity and record magnetometer</button>
+<button id="pocButton" onclick="poc()">Start: generate CPU activity and record magnetometer</button>
 <br/>
-<!--<button id="patternButton" onclick="generatePattern()">Only generate CPU activity</button>-->
-<!--<button id="recordButton" onclick="recordMagnetometer()">Only record magnetometer</button>-->
+<button id="patternButton" onclick="generatePattern()">Only generate CPU activity</button>
+<button id="recordButton" onclick="recordMagnetometer()">Only record magnetometer</button>
 <textarea id="output" readonly rows="15" cols="30"></textarea>
 <canvas id="xChart"></canvas>
 <canvas id="yChart"></canvas>
